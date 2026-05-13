@@ -121,10 +121,11 @@ type fetchSummary struct {
 	topASNs       []countByLabel
 	rareASNs      []countByLabel
 
-	vpn       []threatEntry
-	proxy     []threatEntry
-	malicious []threatEntry
-	activity  []threatEntry // IPs with non-empty Activity or Attribution
+	vpn        []threatEntry
+	proxy      []threatEntry
+	datacenter []threatEntry
+	malicious  []threatEntry
+	activity   []threatEntry // IPs with non-empty Activity or Attribution
 }
 
 func newApp() *App {
@@ -966,6 +967,7 @@ func (a *App) viewSummaryContent() string {
 
 	renderThreatSection(&b, "VPN / Proxy", s.vpn, welcomeBad)
 	renderThreatSection(&b, "Residential proxy", s.proxy, welcomeBad)
+	renderThreatSection(&b, "Datacenter proxy", s.datacenter, welcomeBad)
 	renderThreatSection(&b, "Risky IPs", s.malicious, welcomeBad)
 	renderActivitySection(&b, s.activity)
 
@@ -1186,11 +1188,15 @@ func computeSummary(results []Response, completed, failed int, outputFile string
 		if r.Intel.VPNProxy {
 			s.vpn = append(s.vpn, entry)
 		}
-		if r.Intel.ResidentialProxy != nil {
-			s.proxy = append(s.proxy, entry)
+		if rp := r.Intel.ResidentialProxy; rp != nil {
+			switch rp.Type {
+			case "residential":
+				s.proxy = append(s.proxy, entry)
+			case "data_center":
+				s.datacenter = append(s.datacenter, entry)
+			}
 		}
-		if r.Intel.IsBlacklisted || r.Intel.IsScanner || r.Intel.TorNode ||
-			r.Intel.Activity != "" || r.Intel.Risk == "high" || r.Intel.Risk == "critical" {
+		if r.Intel.Risk == "high" || r.Intel.Risk == "critical" {
 			s.malicious = append(s.malicious, entry)
 		}
 		if r.Intel.Activity != "" || r.Intel.Attribution != "" {
